@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Davenport Diagram Simulator</title>
+<style>
+:root{--bg:#f6f7f4;--panel:#fff;--ink:#1d2a2a;--mute:#5d6b6b;--grid:#d9dedb;--iso:#c8505e;--band:#f2c879;--acc:#0f6b73;--pt:#0f6b73;--comp:#d4572a;--line:#c9d0cc;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a1a;--panel:#1a2424;--ink:#e6eeec;--mute:#9bb0ad;--grid:#2c3a3a;--iso:#e0707c;--band:#7a5d22;--acc:#5fc6cf;--pt:#5fc6cf;--comp:#ff8a5c;--line:#34454a}}
+:root[data-theme="dark"]{--bg:#121a1a;--panel:#1a2424;--ink:#e6eeec;--mute:#9bb0ad;--grid:#2c3a3a;--iso:#e0707c;--band:#7a5d22;--acc:#5fc6cf;--pt:#5fc6cf;--comp:#ff8a5c;--line:#34454a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Iowan Old Style",serif;line-height:1.5}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 16px}
+h1{font-size:1.5rem;margin:0 0 4px}
+p.sub{margin:0 0 16px;color:var(--mute);font-family:system-ui,sans-serif;font-size:.9rem}
+.grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;font-family:system-ui,sans-serif}
+#c{width:100%;height:auto;display:block}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+button{font:inherit;font-size:.85rem;padding:8px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;cursor:pointer}
+button[aria-pressed=true]{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--comp);outline-offset:2px}
+label{display:block;font-size:.85rem;margin:12px 0 4px;color:var(--mute)}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.seg{display:flex;gap:6px}.seg button{flex:1}
+.read{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:14px 0;text-align:center}
+.read div{border:1px solid var(--line);border-radius:6px;padding:6px}
+.read b{display:block;font-size:1.2rem}.read span{font-size:.72rem;color:var(--mute)}
+#note{font-size:.88rem;margin:0}
+.play{width:100%;margin-top:14px;background:var(--comp);color:#fff;border-color:var(--comp);font-weight:600;padding:10px}
+#eq{margin-top:16px;text-align:center}.shift{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px}.sh{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.8rem;color:var(--mute);font-family:system-ui,sans-serif}.sh svg{transition:none}.eqrow{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-end;gap:10px 18px}.term{display:inline-flex;align-items:flex-end;gap:4px}.mol{font-size:1.7rem;font-family:Georgia,serif;line-height:1.15}.hl{background:rgba(0,200,220,.25);border-radius:4px;padding:0 6px}.eqn{font-size:.7rem;color:var(--mute);font-family:system-ui,sans-serif;margin-right:2px}.eqcap{font-size:.8rem;color:var(--mute);margin:10px 0 0}
+.key{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:var(--mute);margin-top:8px}
+.key i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+</style></head><body><div class="wrap">
+<h1>Davenport diagram simulator</h1>
+<p class="sub">Plasma HCO₃⁻ against arterial pH, with PCO₂ isopleths from the Henderson–Hasselbalch equation.</p>
+<div class="grid">
+<div class="card"><svg id="c" viewBox="0 0 560 480" role="img" aria-label="Davenport diagram"></svg>
+<div class="key"><span><i style="background:var(--ink)"></i>Normal</span><span><i style="background:var(--pt)"></i>Primary disturbance</span><span><i style="background:var(--comp)"></i>After compensation</span></div></div>
+<div class="card">
+<div class="tabs" id="tabs"></div>
+<label id="slbl" for="sev"></label>
+<input type="range" id="sev" min="0" max="100" value="60">
+<div id="stagewrap"><label>View</label>
+<div class="seg" id="seg"><button data-s="acute" aria-pressed="true">Primary disturbance</button><button data-s="chronic" aria-pressed="false">After compensation</button></div></div>
+<button class="play" id="play">▶ Play sequence</button>
+<div class="read"><div><b id="rph"></b><span>pH</span></div><div><b id="rpc"></b><span>PCO₂ mmHg</span></div><div><b id="rhc"></b><span>HCO₃⁻ mEq/L</span></div></div>
+<p id="note"></p></div></div>
+<div class="card" id="eq"><div id="shift" class="shift"></div><div class="eqrow"><span class="term"><span id="eq-co2"></span><span class="mol hl">CO₂</span></span><span class="mol">+ H₂O</span><span class="mol">⇌</span><span class="mol">H₂CO₃</span><span class="mol">⇌</span><span class="term"><span id="eq-h"></span><span class="mol">H⁺</span></span><span class="mol">+</span><span class="term"><span id="eq-hc"></span><span class="mol">HCO₃⁻</span></span></div><p class="eqcap">Arrows above the reaction show which way it is pushed. Vertical arrows: large = main change, small = minor change. Blue = primary disturbance, orange = after compensation.</p></div></div>
+<script>
+const NS="http://www.w3.org/2000/svg",svg=document.getElementById("c");
+const X0=56,X1=530,Y0=20,Y1=420,pHmin=7,pHmax=7.8,hMax=60;
+const px=p=>X0+(p-pHmin)/(pHmax-pHmin)*(X1-X0), py=h=>Y1-h/hMax*(Y1-Y0);
+const pH=(h,c)=>6.1+Math.log10(h/(0.03*c)), hco=(p,c)=>0.03*c*Math.pow(10,p-6.1);
+const D={
+ racid:{n:"Respiratory acidosis",lbl:"PCO₂ rise",min:50,max:100,u:" mmHg",resp:true,
+  f:(v,s)=>[v,s=="acute"?24+0.1*(v-40):24+0.35*(v-40)],
+  note:"Hypoventilation raises PCO₂ and lowers pH. Acutely, tissue buffering lifts HCO₃⁻ slightly (~1 per 10 mmHg). Over days the kidneys retain HCO₃⁻ (~3.5 per 10 mmHg), pulling pH back toward normal."},
+ ralk:{n:"Respiratory alkalosis",lbl:"PCO₂ fall",min:36,max:15,u:" mmHg",resp:true,
+  f:(v,s)=>[v,s=="acute"?24-0.2*(40-v):24-0.5*(40-v)],
+  note:"Hyperventilation blows off CO₂ and raises pH. Acutely HCO₃⁻ falls ~2 per 10 mmHg; chronically the kidneys excrete HCO₃⁻ (~5 per 10 mmHg), restoring pH most of the way."},
+ macid:{n:"Metabolic acidosis",lbl:"HCO₃⁻ fall",min:20,max:6,u:" mEq/L",
+  f:v=>[40,v],comp:v=>[1.5*v+8,v],
+  note:"Acid gain or HCO₃⁻ loss moves the point down. Hyperventilation then lowers PCO₂ (Winter's formula: 1.5 × HCO₃⁻ + 8), shifting the point left-up along the buffer line."},
+ malk:{n:"Metabolic alkalosis",lbl:"HCO₃⁻ rise",min:28,max:45,u:" mEq/L",
+  f:v=>[40,v],comp:v=>[40+0.7*(v-24),v],
+  note:"Excess HCO₃⁻ moves the point up. Hypoventilation raises PCO₂ (~0.7 per 1 mEq/L HCO₃⁻ above 24), limited by hypoxia, so compensation is only partial."}
+};
+let key="macid",stage="acute",playing=false,run=0;
+const tabs=document.getElementById("tabs"),sev=document.getElementById("sev"),playBtn=document.getElementById("play");
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+function el(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e}
+function txt(x,y,s,o={}){const e=el("text",Object.assign({x,y,fill:"var(--mute)","font-size":11,"font-family":"system-ui,sans-serif"},o));e.textContent=s;return e}
+const mk=(c,h)=>{h=Math.max(h,0.5);return[pH(h,c),h,c]};
+function target(){
+ const d=D[key],val=d.min+(d.max-d.min)*sev.value/100;
+ let a,b;
+ if(d.resp){a=d.f(val,"acute");b=d.f(val,"chronic")}else{a=d.f(val);b=d.comp(val)}
+ const A=mk(a[0],a[1]),B=mk(b[0],b[1]);
+ return{ax:A[0],ay:A[1],ac:A[2],bx:B[0],by:B[1],bc:B[2],k:stage=="chronic"?1:0};
+}
+let cur=target();
+function render(){
+ svg.innerHTML="";
+ for(let p=7;p<=7.801;p+=0.1){el("line",{x1:px(p),x2:px(p),y1:Y0,y2:Y1,stroke:"var(--grid)"});txt(px(p),Y1+16,p.toFixed(2),{"text-anchor":"middle"})}
+ for(let h=0;h<=60;h+=4){el("line",{x1:X0,x2:X1,y1:py(h),y2:py(h),stroke:"var(--grid)"});if(h%8==0)txt(X0-6,py(h)+4,h,{"text-anchor":"end"})}
+ txt((X0+X1)/2,Y1+36,"Arterial blood pH",{"text-anchor":"middle","font-size":12});
+ txt(14,(Y0+Y1)/2,"Plasma [HCO₃⁻] (mEq/L)",{"text-anchor":"middle","font-size":12,transform:`rotate(-90 14 ${(Y0+Y1)/2})`});
+ [10,15,20,25,30,35,40,50,60,70,80,90,100,110,120].forEach(c=>{
+  let d="",last=null;
+  for(let p=7;p<=7.8;p+=0.01){const h=hco(p,c);if(h<=60&&h>=0){d+=(d?"L":"M")+px(p)+","+py(h);last=[p,h]}}
+  el("path",{d,fill:"none",stroke:"var(--iso)","stroke-width":1.2,opacity:.75});
+  if(last)txt(Math.min(px(last[0])+2,X1-14),py(last[1])+(last[1]>=59?10:3),c,{fill:"var(--iso)","font-size":10});
+ });
+ txt(X1-4,Y0+10,"PCO₂ lines",{"text-anchor":"end",fill:"var(--iso)"});
+ const pts=[];for(let c=15;c<=100;c+=5){const h=24+0.1*(c-40);pts.push(px(pH(h,c))+","+py(h))}
+ el("polyline",{points:pts.join(" "),fill:"none",stroke:"var(--ink)","stroke-width":1.5,"stroke-dasharray":"5 4",opacity:.6});
+ txt(px(7.12),py(30)-6,"Normal buffer line",{fill:"var(--ink)",opacity:.7,"font-size":10});
+ el("ellipse",{cx:px(7.4),cy:py(24),rx:12,ry:7,fill:"none",stroke:"var(--ink)","stroke-width":1.5});
+ const S=cur,k=S.k,Fx=S.ax+(S.bx-S.ax)*k,Fy=S.ay+(S.by-S.ay)*k,Fc=S.ac+(S.bc-S.ac)*k;
+ el("line",{x1:px(7.4),y1:py(24),x2:px(S.ax),y2:py(S.ay),stroke:"var(--pt)","stroke-width":2});
+ if(k>0.01)el("line",{x1:px(S.ax),y1:py(S.ay),x2:px(Fx),y2:py(Fy),stroke:"var(--comp)","stroke-width":2,"stroke-dasharray":"4 3"});
+ el("circle",{cx:px(S.ax),cy:py(S.ay),r:7-2*k,fill:"var(--pt)"});
+ if(k>0.01)el("circle",{cx:px(Fx),cy:py(Fy),r:7*k,fill:"var(--comp)",opacity:Math.min(1,k*3)});
+ document.getElementById("rph").textContent=Fx.toFixed(2);
+ document.getElementById("rpc").textContent=Math.round(Fc);
+ document.getElementById("rhc").textContent=Fy.toFixed(1);
+}
+function labels(){eqUpdate();
+ const d=d_(),val=d.min+(d.max-d.min)*sev.value/100;
+ document.getElementById("slbl").textContent=d.lbl+": "+Math.round(val)+d.u;
+ document.getElementById("note").textContent=d.note+(stage=="acute"?" Showing the primary disturbance only.":" Showing the state after compensation.");
+}
+const d_=()=>D[key];
+const SH={racid:[[1,1,'Excess CO₂ pushes the reaction right'],[-1,0,'Retained HCO₃⁻ pushes it back left']],ralk:[[-1,1,'Lost CO₂ pulls the reaction left'],[1,0,'Excreted HCO₃⁻ pulls it back right']],macid:[[-1,1,'Added H⁺ pushes the reaction left'],[-1,0,'Blown-off CO₂ pulls it further left']],malk:[[1,1,'Lost H⁺ pulls the reaction right'],[1,0,'Retained CO₂ pushes it right']]};
+function harr(dir,big,col){const w=big?300:170,h=24;return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="color:'+col+(dir<0?';transform:scaleX(-1)':'')+';max-width:100%" role="img" aria-label="'+(dir>0?'pushed right':'pushed left')+'"><rect x="0" y="'+(h/2-(big?3:2))+'" width="'+(w-14)+'" height="'+(big?6:4)+'" fill="currentColor"/><polygon points="'+(w-18)+',0 '+w+','+h/2+' '+(w-18)+','+h+'" fill="currentColor"/></svg>'}
+function shiftUpdate(){const L=SH[key].slice(0,stage=="acute"?1:2);document.getElementById("shift").innerHTML=L.map((a,i)=>'<div class="sh">'+harr(a[0],a[1],i?"var(--comp)":"var(--pt)")+'<span>'+a[2]+'</span></div>').join("")}
+const EQ={racid:[[[1,1],[1,1],[1,0]],[[1,1],[1,0],[1,1]]],ralk:[[[-1,1],[-1,1],[-1,0]],[[-1,1],[-1,0],[-1,1]]],macid:[[[0,0],[1,1],[-1,1]],[[-1,1],[1,0],[-1,1]]],malk:[[[0,0],[-1,1],[1,1]],[[1,1],[-1,0],[1,1]]]};
+function arr(a,col){const dir=a[0],big=a[1];if(!dir)return '<span class="eqn">normal</span>';const w=big?24:15,h=big?46:28,hh=big?18:11,sw=big?7:4;return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="color:'+col+(dir<0?';transform:rotate(180deg)':'')+'" role="img" aria-label="'+(dir>0?'increased':'decreased')+'"><polygon points="0,'+hh+' '+w/2+',0 '+w+','+hh+'" fill="currentColor"/><rect x="'+(w-sw)/2+'" y="'+(hh-1)+'" width="'+sw+'" height="'+(h-hh+1)+'" fill="currentColor"/></svg>'}
+function eqUpdate(){shiftUpdate();const e=EQ[key][stage=="acute"?0:1],col=stage=="acute"?"var(--pt)":"var(--comp)",t=n=>document.getElementById(n);t("eq-co2").innerHTML=arr(e[0],col);t("eq-h").innerHTML=arr(e[1],col);t("eq-hc").innerHTML=arr(e[2],col)}
+const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+function go(dur){
+ labels();const id=++run,from={...cur},to=target(),t0=performance.now();
+ if(reduce)dur=0;
+ return new Promise(res=>{(function f(n){
+  if(id!==run)return res(false);
+  const t=dur<=0?1:Math.min(1,(n-t0)/dur),e=ease(t);
+  for(const q in to)cur[q]=from[q]+(to[q]-from[q])*e;
+  render();
+  if(t<1)requestAnimationFrame(f);else res(true);
+ })(t0)});
+}
+function setStage(s){stage=s;document.querySelectorAll("#seg button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.s===s))}
+function stopPlay(){playing=false;playBtn.textContent="▶ Play sequence"}
+Object.keys(D).forEach(k=>{const b=document.createElement("button");b.textContent=D[k].n;b.setAttribute("aria-pressed",k==key);b.onclick=()=>{stopPlay();key=k;[...tabs.children].forEach(c=>c.setAttribute("aria-pressed",c===b));go(800)};tabs.appendChild(b)});
+document.querySelectorAll("#seg button").forEach(b=>b.onclick=()=>{stopPlay();setStage(b.dataset.s);go(800)});
+sev.oninput=()=>{stopPlay();go(200)};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+playBtn.onclick=async()=>{
+ if(playing){stopPlay();run++;return}
+ playing=true;playBtn.textContent="■ Stop";
+ setStage("acute");
+ Object.assign(cur,{ax:7.4,ay:24,ac:40,bx:7.4,by:24,bc:40,k:0});render();
+ // start with A at normal, then travel to primary disturbance
+ const to=target(),from={...cur},id=++run,t0=performance.now();labels();
+ let ok=await new Promise(res=>{(function f(n){if(id!==run)return res(false);const t=Math.min(1,(n-t0)/1500),e=ease(t);
+  for(const q in to)cur[q]=from[q]+(to[q]-from[q])*e;cur.bx=cur.ax;cur.by=cur.ay;cur.bc=cur.ac;cur.k=0;render();
+  if(t<1)requestAnimationFrame(f);else res(true)})(t0)});
+ if(!ok||!playing)return;
+ await sleep(700);if(!playing)return;
+ setStage("chronic");ok=await go(1800);
+ if(ok)stopPlay();
+};
+labels();render();
+</script></body></html>
